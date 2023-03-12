@@ -1,15 +1,15 @@
-from typing import List, Type
+from typing import Callable, List, Type
 
 import torch
 import torch.nn as nn
 
 
-TRAIN_START_DAY = '2008-01-01'
-TRAIN_END_DAY = '2016-12-31'
-TEST_START_DAY = '2017-01-01'
-TEST_END_DAY = '2019-12-31'
-TRADE_START_DAY = '2020-01-01'
-TRADE_END_DAY = '2022-12-31'
+TRAIN_START_DAY = "2008-01-01"
+TRAIN_END_DAY = "2016-12-31"
+TEST_START_DAY = "2017-01-01"
+TEST_END_DAY = "2019-12-31"
+TRADE_START_DAY = "2020-01-01"
+TRADE_END_DAY = "2022-12-31"
 
 
 def create_mlp(
@@ -68,9 +68,9 @@ def quantile_huber_loss(
     The quantile-regression loss.
     Code borrowed from sb3_contrib.common.utils.quantile_huber_loss
 
-    :param q_dist_t: distribution at t. Shape: (batch_size, n_atoms).
-    :param q_dist_tp1: distribution at t + 1. Shape: (batch_size, n_atoms).
-    :param taus: taus correspond to quantiles of q_dist_t. Shape: (batch_size, n_atoms).
+    :param q_dist_t: distribution at t. Shape: (batch_size, num_atoms).
+    :param q_dist_tp1: distribution at t + 1. Shape: (batch_size, num_atoms).
+    :param taus: taus correspond to quantiles of q_dist_t. Shape: (batch_size, num_atoms).
     :param sum_over_quantiles: if summing over the quantile dimension or not
     :return: the loss
     """
@@ -90,8 +90,13 @@ def quantile_huber_loss(
     # pairwise_delta: (batch_size, num_atoms, num_atoms)
     pairwise_delta = q_dist_tp1.unsqueeze(-2) - q_dist_t.unsqueeze(-1)
     abs_pairwise_delta = torch.abs(pairwise_delta)
-    huber_loss = torch.where(abs_pairwise_delta > 1, abs_pairwise_delta - 0.5, pairwise_delta**2 * 0.5)
-    loss = torch.abs(taus.unsqueeze(-2) - (pairwise_delta.detach() < 0).float()) * huber_loss
+    huber_loss = torch.where(
+        abs_pairwise_delta > 1, abs_pairwise_delta - 0.5, pairwise_delta**2 * 0.5
+    )
+    loss = (
+        torch.abs(taus.unsqueeze(-2) - (pairwise_delta.detach() < 0).float())
+        * huber_loss
+    )
     if sum_over_quantiles:
         # (batch_size, num_atoms)
         loss = loss.sum(dim=-1)
@@ -99,3 +104,67 @@ def quantile_huber_loss(
         # (batch_size, num_atoms, num_atoms)
         loss = loss
     return loss
+
+
+def CPW_factory(eta: float) -> Callable[[torch.Tensor], torch.Tensor]:
+    def CPW(taus: torch.Tensor) -> torch.Tensor:
+        taus = (taus**eta) / ((taus**eta + (1 - taus) ** eta) ** (1 / eta))
+        return taus
+
+    return CPW
+
+
+def Wang_factory(eta: float) -> Callable[[torch.Tensor], torch.Tensor]:
+    def Wang(taus: torch.Tensor) -> torch.Tensor:
+        n = torch.distributions.normal.Normal(
+            torch.zeros_like(taus), torch.ones_like(taus)
+        )
+        finfo = torch.finfo(taus.dtype)
+        # clamp to prevent +-inf
+        taus = n.cdf(torch.clamp(n.icdf(taus) + eta, min=finfo.min, max=finfo.max))
+        return taus
+
+    return Wang
+
+
+def CVaR_factory(eta: float) -> Callable[[torch.Tensor], torch.Tensor]:
+    def CVaR(taus: torch.Tensor) -> torch.Tensor:
+        taus = taus * eta
+        return taus
+
+    return CVaR
+
+
+def Norm_factory(eta: int) -> Callable[[torch.Tensor], torch.Tensor]:
+    def Norm(taus: torch.Tensor) -> torch.Tensor:
+        taus = (
+            taus.unsqueeze(-1)
+            .repeat_interleave(repeats=eta, dim=-1)
+            .uniform_(0, 1)
+            .mean(axis=-1)
+        )
+        return taus
+
+    return Norm
+
+
+def Pow_factory(eta: float) -> Callable[[torch.Tensor], torch.Tensor]:
+    def Pow(taus: torch.Tensor) -> torch.Tensor:
+        if eta >= 0:
+            taus = taus ** (1 / (1 + eta))
+        else:
+            taus = 1 - (1 - taus) ** (1 / (1 - eta))
+        return taus
+
+    return Pow
+
+
+DEFAULT_RISK_DISTORTION_MEASURES = {
+    "CPW_0.71": CPW_factory(0.71),
+    "Wang_-0.75": Wang_factory(-0.75),
+    "Wang_0.75": Wang_factory(0.75),
+    "CVaR_0.25": CVaR_factory(0.25),
+    "CVaR_0.4": CVaR_factory(0.4),
+    "Norm_3": Norm_factory(3),
+    "Pow_-2": Pow_factory(-2),
+}

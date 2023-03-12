@@ -1,8 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
-import gym
-import gym.spaces
-import gymnasium
+import gymnasium as gym
 import numpy as np
 from ray.rllib.evaluation import Episode
 from ray.rllib.evaluation.postprocessing import adjust_nstep
@@ -67,7 +65,7 @@ class MyDQNPolicy(
     def __init__(self, observation_space, action_space, config):
 
         assert isinstance(action_space, gym.spaces.Discrete) or isinstance(
-            action_space, gymnasium.spaces.discrete.Discrete
+            action_space, gym.spaces.discrete.Discrete
         ), "Unsurported action space type: {}.".format(type(action_space))
 
         config = dict(
@@ -160,7 +158,7 @@ class MyDQNPolicy(
             if self.model.dqn_type != "cqn":
                 output = output.mean(dim=2)
             else:
-                num_atoms = self.model.n_atoms
+                num_atoms = self.model.num_atoms
                 v_min = self.model.vmin
                 v_max = self.model.vmax
                 z = torch.arange(0.0, num_atoms, dtype=torch.float32).to(output.device)
@@ -241,7 +239,7 @@ class MyDQNPolicy(
         importance_weights = train_batch[PRIO_WEIGHTS]
         gamma = self.config["gamma"]
         n_step = self.config["n_step"]
-        num_atoms = self.model.n_atoms
+        num_atoms = self.model.num_atoms
 
         # 1) Compute greedy action at t+1 step.
         # 2) Compute TD-error.
@@ -281,8 +279,8 @@ class MyDQNPolicy(
             ) * torch.unsqueeze(z, 0)
             r_tau = torch.clamp(r_tau, v_min, v_max)
             b = (r_tau - v_min) / ((v_max - v_min) / float(num_atoms - 1))
-            lb = torch.floor(b)
-            ub = torch.ceil(b)
+            lb = torch.clamp(torch.floor(b), min=0, max=num_atoms - 1)
+            ub = torch.clamp(torch.ceil(b), min=0, max=num_atoms - 1)
 
             # Indispensable judgement which is missed in most implementations
             # when b happens to be an integer, lb == ub, so pr_j(s', a*) will
@@ -496,7 +494,7 @@ class MyDQNPolicy(
         if self.model.dqn_type != "cqn":
             dist_inputs = torch.mean(dist_inputs, dim=-1)
         else:
-            num_atoms = self.model.n_atoms
+            num_atoms = self.model.num_atoms
             v_min = self.model.vmin
             v_max = self.model.vmax
             z = torch.arange(0.0, num_atoms, dtype=torch.float32).to(dist_inputs.device)

@@ -1,0 +1,7 @@
+dm_tree==0.1.8
+gym==0.21.0
+Gymnasium==0.26.3
+numpy==1.23.1
+ray==2.3.0
+torch==1.12.1
+tree==0.2.4

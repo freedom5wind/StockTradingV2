@@ -1,7 +1,7 @@
 import tree
 from typing import Dict, List, Tuple
 
-import gym
+import gymnasium as gym
 import numpy as np
 from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
@@ -45,17 +45,17 @@ class MyDQNModel(RecurrentNetwork, nn.Module):
         self.dqn_type = self.model_config.get("type", "dqn")
 
         if self.dqn_type == "cqn":
-            self.n_atoms = self.model_config.get("n_atoms", 50)
+            self.num_atoms = self.model_config.get("num_atoms", 50)
             self.vmin = self.model_config.get("vmin", -10)
             self.vmax = self.model_config.get("vmax", 10)
-            self.output_dim = action_space.n * self.n_atoms
+            self.output_dim = action_space.n * self.num_atoms
         elif self.dqn_type == "qrdqn":
-            self.n_atoms = self.model_config.get("n_atoms", 20)
-            self.output_dim = action_space.n * self.n_atoms
+            self.num_atoms = self.model_config.get("num_atoms", 20)
+            self.output_dim = action_space.n * self.num_atoms
         else:
-            self.n_atoms = 1
-            self.output_dim = action_space.n * self.n_atoms
-        self.num_outputs = self.action_space.n * self.n_atoms
+            self.num_atoms = 1
+            self.output_dim = action_space.n * self.num_atoms
+        self.num_outputs = self.action_space.n * self.num_atoms
 
         self.action_mask_fn = self.model_config.get("action_mask_fn", None)
 
@@ -91,7 +91,7 @@ class MyDQNModel(RecurrentNetwork, nn.Module):
             time_major=self.time_major,
         )
         output, new_state = self.forward_rnn(inputs, state, seq_lens)
-        output = torch.reshape(output, [-1, self.action_space.n, self.n_atoms])
+        output = torch.reshape(output, [-1, self.action_space.n, self.num_atoms])
         return output, new_state
 
     @override(RecurrentNetwork)
@@ -102,7 +102,7 @@ class MyDQNModel(RecurrentNetwork, nn.Module):
         output, state_out = self.lstm(inputs, states)
         state_out = tree.map_structure(lambda x: x.transpose(0, 1), state_out)
         output = output.reshape([-1, self.lstm_dim])
-        output = self.mlp(output).view(-1, self.action_space.n, self.n_atoms)
+        output = self.mlp(output).view(-1, self.action_space.n, self.num_atoms)
         return output, list(state_out)
 
     def _build(self):
@@ -178,7 +178,7 @@ class IQNModel(RecurrentNetwork, nn.Module):
         self.net_arch = self.model_config.get("net_arch", [256, 256])
         self.activation_fn = self.model_config.get("activation_fn", nn.ReLU)
         self.dqn_type = "iqn"
-        self.n_atoms = self.model_config.get("n_atoms", 64)
+        self.num_atoms = self.model_config.get("num_atoms", 64)
 
         self.action_mask_fn = self.model_config.get("action_mask_fn", None)
         self.num_outputs = self.action_space.n
@@ -215,7 +215,7 @@ class IQNModel(RecurrentNetwork, nn.Module):
             time_major=self.time_major,
         )
         output, new_state = self.forward_rnn(inputs, state, seq_lens)
-        output = torch.reshape(output, [-1, self.action_space.n, self.n_atoms])
+        output = torch.reshape(output, [-1, self.action_space.n, self.num_atoms])
         return output, new_state
 
     @override(RecurrentNetwork)
@@ -229,7 +229,7 @@ class IQNModel(RecurrentNetwork, nn.Module):
         # B: batch size, N: sample num
         output = output.reshape([-1, self.lstm_dim])
         B = output.shape[0]
-        N = self.n_atoms
+        N = self.num_atoms
 
         # sample taus
         taus = torch.rand(B, N, dtype=output.dtype, device=output.device)

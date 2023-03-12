@@ -8,7 +8,12 @@ def main_test():
         config = MyDQNConfig()
         config.framework(framework="torch")
         config.environment(env="CartPole-v1")
-        config.model["custom_model_config"].update({"type": dqn_type})
+        config.model["custom_model_config"].update(
+            {
+                "type": dqn_type,
+                "num_atoms": 51,
+            }
+        )
         config.num_steps_sampled_before_learning_starts = 10
         config.min_sample_timesteps_per_iteration = 100
         config.train_batch_size = 32
