@@ -35,17 +35,12 @@ class SingleStockTradingEnv(gym.Env):
         self._dfs = env_config.get("df")
         if not isinstance(self._dfs, List):
             self._dfs = [self._dfs]
-        self._dfs = deque(self._dfs)
+        self.num_df = env_config.get("num_df", len(self._dfs))
+        self._dfs = deque(self._dfs[: self.num_df])
         self.df = self._dfs[0]
 
-        for i in self._dfs:
-            assert "close" in i.columns, "Data frame doesn't have column 'close'."
-            assert (
-                i.columns[0] == "date"
-            ), "First column of the data frame is not 'date'"
-            assert i.isna().sum().sum() == 0, "Nan in input date frame."
-
         self.seed = env_config.get("seed")
+        self.shuffle = env_config.get("shuffle", False)
         self.np_random = np.random.RandomState(self.seed)
 
         self.initial_cash = env_config.get("initial_cash", 1000_000)
@@ -68,17 +63,31 @@ class SingleStockTradingEnv(gym.Env):
             ),  # 1 for position state.
         )
 
+        for i in self._dfs:
+            assert "close" in i.columns, "Data frame doesn't have column 'close'."
+            assert (
+                i.columns[0] == "date"
+            ), "First column of the data frame is not 'date'"
+            assert i.isna().sum().sum() == 0, "Nan in input date frame."
+            assert i.shape[0] == self.data.shape[0] and i.shape[1]-2 == self.data.shape[1], \
+                f"{i.shape}, {self.data.shape} not match."
+
         # TODO: figure out how to log in rollout worker process.
         self.logger = logging.getLogger(__name__)
 
         self.reset()
 
     def reset(self, *, seed=None, options=None) -> Tuple[np.array, Dict]:
-        if self.seed is not None:
+        if self.shuffle:
             np.random.shuffle(self._dfs)
         else:
             self._dfs.rotate(-1)
         self.df = self._dfs[0]
+        self.date = self.df["date"]
+        self.prices = self.df["close"].to_numpy()
+        self.data = self.df[
+            [col for col in self.df.columns if col != "date" and col != "close"]
+        ].to_numpy()
 
         self.terminal = False
         # skip n days for frame stacking
