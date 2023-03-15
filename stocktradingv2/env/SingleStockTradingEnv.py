@@ -69,20 +69,29 @@ class SingleStockTradingEnv(gym.Env):
                 i.columns[0] == "date"
             ), "First column of the data frame is not 'date'"
             assert i.isna().sum().sum() == 0, "Nan in input date frame."
-            assert i.shape[0] == self.data.shape[0] and i.shape[1]-2 == self.data.shape[1], \
-                f"{i.shape}, {self.data.shape} not match."
+            assert (
+                i.shape[0] == self.data.shape[0]
+                and i.shape[1] - 2 == self.data.shape[1]
+            ), f"{i.shape}, {self.data.shape} not match."
 
         # TODO: figure out how to log in rollout worker process.
         self.logger = logging.getLogger(__name__)
 
+        self.success_trade = 0
+        self.total_trading = 0
+        self.account = self.initial_cash
+        self.asset_memory = [self.account]
+
         self.reset()
 
     def reset(self, *, seed=None, options=None) -> Tuple[np.array, Dict]:
-        if self.shuffle:
-            np.random.shuffle(self._dfs)
-        else:
-            self._dfs.rotate(-1)
-        self.df = self._dfs[0]
+        # if self.shuffle:
+        #     np.random.shuffle(self._dfs)
+        # else:
+        #     self._dfs.rotate(-1)
+        # self.df = self._dfs[0]
+        # Use callback 'on_episode_create' to set df instead.
+
         self.date = self.df["date"]
         self.prices = self.df["close"].to_numpy()
         self.data = self.df[
@@ -94,6 +103,11 @@ class SingleStockTradingEnv(gym.Env):
         self.day = self.stack_frame - 1
         self.share_num = 0
         self.account = self.initial_cash
+
+        self._last_total_trading = self.total_trading
+        self._last_success_trade = self.success_trade
+        self._last_asset_memory = self.asset_memory
+
         self.asset_memory = [self.account]
         self.action_memory = []
         self.buying_price = 0
