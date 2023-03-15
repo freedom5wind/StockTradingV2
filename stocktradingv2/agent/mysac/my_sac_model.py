@@ -296,6 +296,9 @@ class MySACModel(RNNSACTorchModel):
             Union[TensorType, List[TensorType]]: A single loss tensor or a list
                 of loss tensors.
         """
+        device = next(self.q_net.parameters()).device
+        target_model = self.get_target_model().to(device)
+
         target_model = self.get_target_model()
         self.q_net._raw = target_model.q_net._raw = True
         if self.twin_q_net is not None:

@@ -1,5 +1,6 @@
 from typing import Callable, List, Type
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -56,6 +57,21 @@ def create_mlp(
     if squash_output:
         modules.append(nn.Tanh())
     return modules
+
+
+# my version
+def ema(data: np.array, encof: int) -> np.array:
+    encof = int(encof)
+    assert encof > 1, f"Invalid encof {encof}"
+
+    alpha = 2 / (1 + encof)
+    beta = 1 - alpha
+    beta_pow = beta ** np.arange(data.shape[-1])[::-1] + np.finfo(float).eps
+    encof = beta_pow * alpha
+    encof[0] /= alpha
+    assert np.abs(np.sum(encof) - 1) < 1e-5, encof
+    ema = np.cumsum(encof * data, axis=-1) / beta_pow
+    return ema
 
 
 def quantile_huber_loss(
