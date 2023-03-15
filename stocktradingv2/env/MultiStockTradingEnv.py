@@ -30,7 +30,7 @@ class MultiStockTradingEnv(gym.Env):
             "Data frame should have multi-index with date and tic."
         assert 'change' in self.df.columns, \
             "Data frame should have column 'change'."
-        assert self.df.isnan().sum().sum() == 0, \
+        assert self.df.isna().sum().sum() == 0, \
             "Nan in input date frame."
 
         self.cost_pct = env_config.get("cost_pct", 0.001)
@@ -56,13 +56,14 @@ class MultiStockTradingEnv(gym.Env):
             (self.stack_frame * self.feature_dims * self.num_tickers \
             + (self.num_tickers + 1),)
         # Action space includes cash(index 0) and n tickers.
-        self.action_space = Simplex(low=0, high=1, shape=(self.num_tickers + 1,)) 
+        self.action_space = Box(low=-1e5, high=1e5, shape=(self.num_tickers + 1,)) 
         self.observation_space = \
             Box(low=-np.inf, high=np.inf, shape=self.observation_shape)
 
+        self.logger = logging.getLogger(__name__)
         self.reset()
 
-    def reset(self) -> Tuple[np.array, Dict]:
+    def reset(self, *, seed=None, options=None) -> Tuple[np.array, Dict]:
         self.terminal = False
         # skip n days for frame stacking
         self.day = self.stack_frame - 1
@@ -74,6 +75,9 @@ class MultiStockTradingEnv(gym.Env):
         self.action_memory = []
         self.reward_memory = []
 
+        self.win_count = 0
+        self.total_cost = 0
+
         return self.state, {}
 
     def step(self, action: np.array) -> Tuple[np.array, float, bool, bool, Dict]:
@@ -83,14 +87,18 @@ class MultiStockTradingEnv(gym.Env):
         self.terminal = self.day >= self.date.shape[0] - 2
 
         # Exclude cash to compute cost
-        transaction = np.abs(self.portfolio - action)[1:].sum() * self.transaction_cost
-        self.asset *= 1 - transaction
+        cost = np.abs(self.portfolio - action)[1:].sum() * self.cost_pct
+        self.total_cost += cost * self.asset
+        self.asset *= 1 - cost
+        last_portfolio = self.portfolio
         self.portfolio = action
 
         # state: s -> s+1
         self.day += 1
 
         changes = np.insert(self.change_matrix[self.day], 0, 0)
+        if np.dot(changes, self.portfolio) > np.dot(changes, last_portfolio):
+            self.win_count += 1
         self.asset *= 1 + np.dot(changes, self.portfolio)
         self.asset_memory.append(self.asset)
 
