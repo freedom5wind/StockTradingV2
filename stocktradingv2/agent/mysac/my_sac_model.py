@@ -299,10 +299,6 @@ class MySACModel(RNNSACTorchModel):
         device = next(self.q_net.parameters()).device
         target_model = self.get_target_model().to(device)
 
-<<<<<<< HEAD
-=======
-        target_model = self.get_target_model()
->>>>>>> 65d8738c41a875b45b493e30c7a7d7f513976a90
         self.q_net._raw = target_model.q_net._raw = True
         if self.twin_q_net is not None:
             self.twin_q_net._raw = target_model.twin_q_net._raw = True

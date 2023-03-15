@@ -63,7 +63,6 @@ class MyDQNPolicy(
     TorchPolicyV2,
 ):
     def __init__(self, observation_space, action_space, config):
-
         assert isinstance(action_space, gym.spaces.Discrete) or isinstance(
             action_space, gym.spaces.discrete.Discrete
         ), "Unsurported action space type: {}.".format(type(action_space))
@@ -139,7 +138,6 @@ class MyDQNPolicy(
         timestep: Optional[int] = None,
         **kwargs,
     ) -> Tuple[TensorStructType, List[TensorType], Dict[str, TensorType]]:
-
         with torch.no_grad():
             seq_lens = torch.ones(len(obs_batch), dtype=torch.int32)
             input_dict = self._lazy_tensor_dict(
@@ -192,6 +190,9 @@ class MyDQNPolicy(
         Returns:
             TensorType: A single loss tensor.
         """
+        device = next(self.model.parameters()).device
+        self.target_model.to(device)
+
         seq_lens = train_batch[SampleBatch.SEQ_LENS]
         input_dict = self._lazy_tensor_dict(
             {
@@ -245,7 +246,6 @@ class MyDQNPolicy(
         # 2) Compute TD-error.
         # 3) compute loss.
         if self.model.dqn_type == "cqn":
-
             # cf. ray.rllib.algorithms.dqn.dqn_torch_policy.QLoss
             v_min = self.model.vmin
             v_max = self.model.vmax
@@ -413,7 +413,6 @@ class MyDQNPolicy(
     def optimizer(
         self,
     ) -> "torch.optim.Optimizer":
-
         # By this time, the models have been moved to the GPU - if any - and we
         # can define our optimizers using the correct CUDA variables.
         if not hasattr(self, "q_func_vars"):

@@ -56,15 +56,6 @@ class MyDQNConfig(DQNConfig):
         self.train_batch_size = 480
         self.target_network_update_freq = 480
         self.tau = 0.3
-        # "train_batch_size": 480,
-        # "target_network_update_freq": 480,
-        # "tau": 0.3,
-        # "zero_init_states": True,
-
-        self.evaluation_interval = 3
-        self.evaluation_duration = 1
-        self.evaluation_duration_unit = "episodes"
-        self.evaluation_config = {"explore": False}
 
 
 class MyDQN(DQN):

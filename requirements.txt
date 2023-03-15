@@ -2,6 +2,8 @@ numpy==1.23.1
 pandas
 torch
 Gymnasium==0.26.3
+PyPortfolioOpt
 ray[rllib]==2.3.0
+scikit-learn
 matplotlib
 seaborn

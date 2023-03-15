@@ -20,7 +20,6 @@ class MultiStockTradingEnv(gym.Env):
     metadata = {"render.modes": ["human"]}
 
     def __init__(self, env_config) -> None:
-
         assert (
             "df" in env_config and len(env_config["df"]) > 0
         ), "Input data frame can't be empty."
@@ -63,7 +62,7 @@ class MultiStockTradingEnv(gym.Env):
         )
         # Action space includes cash(index 0) and n tickers.
         # self.action_space = Box(low=-1e5, high=1e5, shape=(self.num_tickers + 1,))
-        self.action_memory = Simplex(shape=(self.num_tickers + 1,))
+        self.action_space = Simplex(shape=(self.num_tickers + 1,))
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=self.observation_shape
         )
